@@ -65,42 +65,71 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
     
     if method == 'POST':
-        body_data = json.loads(event.get('body', '{}'))
-        username = body_data.get('username', '')
-        password = body_data.get('password', '')
-        full_name = body_data.get('fullName', '')
-        position = body_data.get('position', '')
-        department = body_data.get('department', '')
-        email = body_data.get('email', '')
-        phone = body_data.get('phone', '')
-        
-        import hashlib
-        password_hash = hashlib.sha256(password.encode()).hexdigest()
-        
-        cur.execute(
-            """INSERT INTO users (username, password_hash, full_name, role) 
-               VALUES (%s, %s, %s, 'employee') RETURNING id""",
-            (username, password_hash, full_name)
-        )
-        user_id = cur.fetchone()[0]
-        
-        cur.execute(
-            """INSERT INTO employees (user_id, position, department, email, phone, hire_date) 
-               VALUES (%s, %s, %s, %s, %s, CURRENT_DATE) RETURNING id""",
-            (user_id, position, department, email, phone)
-        )
-        employee_id = cur.fetchone()[0]
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        return {
-            'statusCode': 201,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'id': employee_id, 'userId': user_id, 'message': 'Employee created'}),
-            'isBase64Encoded': False
-        }
+        try:
+            body_data = json.loads(event.get('body', '{}'))
+            username = body_data.get('username', '')
+            password = body_data.get('password', '')
+            full_name = body_data.get('fullName', '')
+            position = body_data.get('position', '')
+            department = body_data.get('department', '')
+            email = body_data.get('email', '')
+            phone = body_data.get('phone', '')
+            
+            import hashlib
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            
+            cur.execute(
+                """INSERT INTO users (username, password_hash, full_name, role) 
+                   VALUES (%s, %s, %s, 'employee') RETURNING id""",
+                (username, password_hash, full_name)
+            )
+            user_id = cur.fetchone()[0]
+            
+            cur.execute(
+                """INSERT INTO employees (user_id, position, department, email, phone, hire_date) 
+                   VALUES (%s, %s, %s, %s, %s, CURRENT_DATE) RETURNING id""",
+                (user_id, position, department, email, phone)
+            )
+            employee_id = cur.fetchone()[0]
+            
+            conn.commit()
+            cur.close()
+            conn.close()
+            
+            return {
+                'statusCode': 201,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'id': employee_id, 'userId': user_id, 'message': 'Employee created'}),
+                'isBase64Encoded': False
+            }
+        except psycopg2.IntegrityError as e:
+            conn.rollback()
+            cur.close()
+            conn.close()
+            error_message = str(e)
+            if 'unique' in error_message.lower() or 'duplicate' in error_message.lower():
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Этот логин уже занят'}),
+                    'isBase64Encoded': False
+                }
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Ошибка базы данных'}),
+                'isBase64Encoded': False
+            }
+        except Exception as e:
+            conn.rollback()
+            cur.close()
+            conn.close()
+            return {
+                'statusCode': 500,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': f'Ошибка сервера: {str(e)}'}),
+                'isBase64Encoded': False
+            }
     
     if method == 'PUT':
         body_data = json.loads(event.get('body', '{}'))

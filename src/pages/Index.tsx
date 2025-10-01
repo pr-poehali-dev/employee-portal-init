@@ -102,6 +102,8 @@ export default function Index() {
   const [newMessage, setNewMessage] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<number | null>(null);
+  const [employeeError, setEmployeeError] = useState('');
+  const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [newEmployee, setNewEmployee] = useState({
@@ -196,6 +198,13 @@ export default function Index() {
   };
 
   const handleCreateEmployee = async () => {
+    setEmployeeError('');
+    
+    if (!newEmployee.username.trim() || !newEmployee.password.trim() || !newEmployee.fullName.trim()) {
+      setEmployeeError('Заполните все обязательные поля: Логин, Пароль, ФИО');
+      return;
+    }
+    
     try {
       const response = await fetch(API_URLS.employees, {
         method: 'POST',
@@ -214,9 +223,15 @@ export default function Index() {
           email: '',
           phone: ''
         });
+        setEmployeeError('');
+        setIsEmployeeDialogOpen(false);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setEmployeeError(errorData.error || 'Ошибка при создании сотрудника');
       }
     } catch (error) {
       console.error('Ошибка создания сотрудника:', error);
+      setEmployeeError('Ошибка подключения к серверу');
     }
   };
 
@@ -528,9 +543,26 @@ export default function Index() {
               <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0 p-4 md:p-6">
                 <CardTitle className="text-base md:text-lg">Управление сотрудниками</CardTitle>
                 {user.role === 'admin' && (
-                  <Dialog>
+                  <Dialog open={isEmployeeDialogOpen} onOpenChange={(open) => {
+                    setIsEmployeeDialogOpen(open);
+                    if (!open) {
+                      setEmployeeError('');
+                      setNewEmployee({
+                        username: '',
+                        password: '',
+                        fullName: '',
+                        position: '',
+                        department: '',
+                        email: '',
+                        phone: ''
+                      });
+                    }
+                  }}>
                     <DialogTrigger asChild>
-                      <Button className="w-full md:w-auto min-h-[44px]">
+                      <Button className="w-full md:w-auto min-h-[44px]" onClick={() => {
+                        setEmployeeError('');
+                        setIsEmployeeDialogOpen(true);
+                      }}>
                         <Icon name="UserPlus" size={18} className="mr-2" />
                         Добавить сотрудника
                       </Button>
@@ -541,28 +573,31 @@ export default function Index() {
                       </DialogHeader>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                         <div className="space-y-2">
-                          <Label className="text-sm">Логин</Label>
+                          <Label className="text-sm">Логин <span className="text-destructive">*</span></Label>
                           <Input
                             value={newEmployee.username}
                             onChange={(e) => setNewEmployee({...newEmployee, username: e.target.value})}
                             className="h-11"
+                            placeholder="ivan_petrov"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-sm">Пароль</Label>
+                          <Label className="text-sm">Пароль <span className="text-destructive">*</span></Label>
                           <Input
                             type="password"
                             value={newEmployee.password}
                             onChange={(e) => setNewEmployee({...newEmployee, password: e.target.value})}
                             className="h-11"
+                            placeholder="••••••••"
                           />
                         </div>
                         <div className="space-y-2 md:col-span-2">
-                          <Label className="text-sm">ФИО</Label>
+                          <Label className="text-sm">ФИО <span className="text-destructive">*</span></Label>
                           <Input
                             value={newEmployee.fullName}
                             onChange={(e) => setNewEmployee({...newEmployee, fullName: e.target.value})}
                             className="h-11"
+                            placeholder="Иванов Иван Иванович"
                           />
                         </div>
                         <div className="space-y-2">
@@ -571,6 +606,7 @@ export default function Index() {
                             value={newEmployee.position}
                             onChange={(e) => setNewEmployee({...newEmployee, position: e.target.value})}
                             className="h-11"
+                            placeholder="Менеджер"
                           />
                         </div>
                         <div className="space-y-2">
@@ -579,6 +615,7 @@ export default function Index() {
                             value={newEmployee.department}
                             onChange={(e) => setNewEmployee({...newEmployee, department: e.target.value})}
                             className="h-11"
+                            placeholder="Продажи"
                           />
                         </div>
                         <div className="space-y-2">
@@ -588,6 +625,7 @@ export default function Index() {
                             value={newEmployee.email}
                             onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
                             className="h-11"
+                            placeholder="ivan@company.ru"
                           />
                         </div>
                         <div className="space-y-2">
@@ -596,9 +634,15 @@ export default function Index() {
                             value={newEmployee.phone}
                             onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
                             className="h-11"
+                            placeholder="+7 (999) 123-45-67"
                           />
                         </div>
                       </div>
+                      {employeeError && (
+                        <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md mb-2">
+                          {employeeError}
+                        </div>
+                      )}
                       <Button onClick={handleCreateEmployee} className="w-full min-h-[44px]">
                         Создать сотрудника
                       </Button>
