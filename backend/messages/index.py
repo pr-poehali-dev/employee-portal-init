@@ -1,8 +1,8 @@
 '''
-Business: Управление сообщениями в заявках - получение и отправка
+Business: Общий чат для всех пользователей - получение и отправка сообщений
 Args: event - dict с httpMethod, body, queryStringParameters
       context - object с request_id
-Returns: HTTP response со списком сообщений или результатом отправки
+Returns: HTTP response со списком сообщений общего чата или результатом отправки
 '''
 import json
 import os
@@ -31,25 +31,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     if method == 'GET':
         params = event.get('queryStringParameters', {}) or {}
-        request_id = params.get('requestId')
-        
-        if not request_id:
-            cur.close()
-            conn.close()
-            return {
-                'statusCode': 400,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'error': 'requestId required'}),
-                'isBase64Encoded': False
-            }
+        limit = int(params.get('limit', '100'))
         
         cur.execute("""
-            SELECT m.id, m.message, m.is_admin_reply, m.created_at, u.full_name, u.username
-            FROM request_messages m
-            LEFT JOIN users u ON m.user_id = u.id
-            WHERE m.request_id = %s
-            ORDER BY m.created_at ASC
-        """, (request_id,))
+            SELECT m.id, m.message, m.created_at, u.full_name, u.username, u.role
+            FROM chat_messages m
+            JOIN users u ON m.user_id = u.id
+            ORDER BY m.created_at DESC
+            LIMIT %s
+        """, (limit,))
         rows = cur.fetchall()
         
         messages = []
@@ -57,11 +47,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             messages.append({
                 'id': row[0],
                 'message': row[1],
-                'isAdminReply': row[2],
-                'createdAt': str(row[3]),
-                'authorName': row[4],
-                'authorUsername': row[5]
+                'createdAt': str(row[2]),
+                'authorName': row[3],
+                'authorUsername': row[4],
+                'authorRole': row[5]
             })
+        
+        messages.reverse()
         
         cur.close()
         conn.close()
@@ -75,17 +67,27 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     if method == 'POST':
         body_data = json.loads(event.get('body', '{}'))
-        request_id = body_data.get('requestId')
         user_id = body_data.get('userId')
-        message = body_data.get('message')
-        is_admin_reply = body_data.get('isAdminReply', False)
+        message = body_data.get('message', '').strip()
+        
+        if not message:
+            cur.close()
+            conn.close()
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                'body': json.dumps({'error': 'Message cannot be empty'}),
+                'isBase64Encoded': False
+            }
         
         cur.execute(
-            """INSERT INTO request_messages (request_id, user_id, message, is_admin_reply) 
-               VALUES (%s, %s, %s, %s) RETURNING id""",
-            (request_id, user_id, message, is_admin_reply)
+            """INSERT INTO chat_messages (user_id, message) 
+               VALUES (%s, %s) RETURNING id, created_at""",
+            (user_id, message)
         )
-        message_id = cur.fetchone()[0]
+        result = cur.fetchone()
+        message_id = result[0]
+        created_at = result[1]
         
         conn.commit()
         cur.close()
@@ -94,7 +96,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 201,
             'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'id': message_id, 'message': 'Message sent'}),
+            'body': json.dumps({'id': message_id, 'createdAt': str(created_at), 'message': 'Message sent'}),
             'isBase64Encoded': False
         }
     

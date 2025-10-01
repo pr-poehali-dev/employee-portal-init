@@ -66,18 +66,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     if method == 'POST':
         body_data = json.loads(event.get('body', '{}'))
-        username = body_data.get('username')
-        password = body_data.get('password')
-        full_name = body_data.get('fullName')
-        position = body_data.get('position')
-        department = body_data.get('department')
-        email = body_data.get('email')
-        phone = body_data.get('phone')
+        username = body_data.get('username', '')
+        password = body_data.get('password', '')
+        full_name = body_data.get('fullName', '')
+        position = body_data.get('position', '')
+        department = body_data.get('department', '')
+        email = body_data.get('email', '')
+        phone = body_data.get('phone', '')
+        
+        import hashlib
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
         
         cur.execute(
             """INSERT INTO users (username, password_hash, full_name, role) 
                VALUES (%s, %s, %s, 'employee') RETURNING id""",
-            (username, password, full_name)
+            (username, password_hash, full_name)
         )
         user_id = cur.fetchone()[0]
         

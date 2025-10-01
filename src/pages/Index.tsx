@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +45,15 @@ interface Stats {
   resolvedRequests: number;
 }
 
+interface ChatMessage {
+  id: number;
+  message: string;
+  createdAt: string;
+  authorName: string;
+  authorUsername: string;
+  authorRole: string;
+}
+
 const API_URLS = {
   auth: 'https://functions.poehali.dev/79f52abf-6019-4592-8ac1-10540fea6d22',
   employees: 'https://functions.poehali.dev/4425d475-de9f-4e79-81ab-a9eb1376bb3a',
@@ -62,6 +71,9 @@ export default function Index() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loginError, setLoginError] = useState('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [newEmployee, setNewEmployee] = useState({
     username: '',
@@ -92,6 +104,7 @@ export default function Index() {
         setUser(data.user);
         setLoginError('');
         loadData();
+        loadChatMessages();
       } else {
         setLoginError(data.error || 'Неверные учетные данные');
       }
@@ -117,6 +130,39 @@ export default function Index() {
       setStats(statsData);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
+    }
+  };
+
+  const loadChatMessages = async () => {
+    try {
+      const response = await fetch(`${API_URLS.messages}?limit=100`);
+      const data = await response.json();
+      setChatMessages(data.messages || []);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } catch (error) {
+      console.error('Ошибка загрузки сообщений:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!user || !newMessage.trim()) return;
+    
+    try {
+      const response = await fetch(API_URLS.messages, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          message: newMessage
+        })
+      });
+
+      if (response.ok) {
+        setNewMessage('');
+        loadChatMessages();
+      }
+    } catch (error) {
+      console.error('Ошибка отправки сообщения:', error);
     }
   };
 
@@ -200,8 +246,13 @@ export default function Index() {
   useEffect(() => {
     if (user) {
       loadData();
-      const interval = setInterval(loadData, 10000);
-      return () => clearInterval(interval);
+      loadChatMessages();
+      const dataInterval = setInterval(loadData, 10000);
+      const chatInterval = setInterval(loadChatMessages, 3000);
+      return () => {
+        clearInterval(dataInterval);
+        clearInterval(chatInterval);
+      };
     }
   }, [user]);
 
@@ -260,115 +311,127 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Icon name="Building2" size={24} className="text-white" />
+        <div className="container mx-auto px-3 md:px-4 py-3 md:py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                <Icon name="Building2" size={18} className="text-white md:hidden" />
+                <Icon name="Building2" size={24} className="text-white hidden md:block" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-sm md:text-xl font-semibold text-foreground truncate">Корпоративный Портал</h1>
+                <p className="text-xs text-muted-foreground hidden md:block">Система управления</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">Корпоративный Портал</h1>
-              <p className="text-xs text-muted-foreground">Система управления</p>
+            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+              <div className="text-right hidden md:block">
+                <p className="text-sm font-medium">{user.fullName}</p>
+                <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                  {user.role === 'admin' ? 'Администратор' : 'Сотрудник'}
+                </Badge>
+              </div>
+              <div className="md:hidden">
+                <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="text-xs">
+                  {user.role === 'admin' ? 'Админ' : 'Сотрудник'}
+                </Badge>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setUser(null)}>
+                <Icon name="LogOut" size={16} />
+              </Button>
             </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm font-medium">{user.fullName}</p>
-              <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                {user.role === 'admin' ? 'Администратор' : 'Сотрудник'}
-              </Badge>
-            </div>
-            <Button variant="outline" onClick={() => setUser(null)}>
-              <Icon name="LogOut" size={18} />
-            </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-3 md:px-4 py-4 md:py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
-            <TabsTrigger value="dashboard">
-              <Icon name="LayoutDashboard" size={18} className="mr-2" />
-              Дашборд
+          <TabsList className="mb-4 md:mb-6 grid grid-cols-4 w-full">
+            <TabsTrigger value="dashboard" className="text-xs md:text-sm">
+              <Icon name="LayoutDashboard" size={16} className="mr-0 md:mr-2" />
+              <span className="hidden md:inline">Дашборд</span>
             </TabsTrigger>
-            <TabsTrigger value="employees">
-              <Icon name="Users" size={18} className="mr-2" />
-              Сотрудники
+            <TabsTrigger value="employees" className="text-xs md:text-sm">
+              <Icon name="Users" size={16} className="mr-0 md:mr-2" />
+              <span className="hidden md:inline">Сотрудники</span>
             </TabsTrigger>
-            <TabsTrigger value="requests">
-              <Icon name="FileText" size={18} className="mr-2" />
-              Заявки
+            <TabsTrigger value="requests" className="text-xs md:text-sm">
+              <Icon name="FileText" size={16} className="mr-0 md:mr-2" />
+              <span className="hidden md:inline">Заявки</span>
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="text-xs md:text-sm">
+              <Icon name="MessageSquare" size={16} className="mr-0 md:mr-2" />
+              <span className="hidden md:inline">Чат</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="dashboard" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <TabsContent value="dashboard" className="space-y-4 md:space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                     Сотрудников
                   </CardTitle>
-                  <Icon name="Users" size={20} className="text-primary" />
+                  <Icon name="Users" size={18} className="text-primary" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold">{stats?.totalEmployees || 0}</div>
+                  <div className="text-2xl md:text-3xl font-bold">{stats?.totalEmployees || 0}</div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Всего заявок
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                    Заявок
                   </CardTitle>
-                  <Icon name="FileText" size={20} className="text-primary" />
+                  <Icon name="FileText" size={18} className="text-primary" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold">{stats?.totalRequests || 0}</div>
+                  <div className="text-2xl md:text-3xl font-bold">{stats?.totalRequests || 0}</div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                     В ожидании
                   </CardTitle>
-                  <Icon name="Clock" size={20} className="text-amber-500" />
+                  <Icon name="Clock" size={18} className="text-amber-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-amber-600">{stats?.pendingRequests || 0}</div>
+                  <div className="text-2xl md:text-3xl font-bold text-amber-600">{stats?.pendingRequests || 0}</div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                     Решено
                   </CardTitle>
-                  <Icon name="CheckCircle" size={20} className="text-green-500" />
+                  <Icon name="CheckCircle" size={18} className="text-green-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-green-600">{stats?.resolvedRequests || 0}</div>
+                  <div className="text-2xl md:text-3xl font-bold text-green-600">{stats?.resolvedRequests || 0}</div>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Последние заявки</CardTitle>
+                  <CardTitle className="text-base md:text-lg">Последние заявки</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {requests.slice(0, 5).map((request) => (
                       <div key={request.id} className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{request.title}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{request.authorName}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{request.title}</p>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">{request.authorName}</p>
                         </div>
                         <Badge variant={
                           request.status === 'resolved' ? 'default' :
                           request.status === 'pending' ? 'secondary' : 'outline'
-                        }>
+                        } className="text-xs flex-shrink-0 ml-2">
                           {request.status}
                         </Badge>
                       </div>
@@ -382,18 +445,18 @@ export default function Index() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Активные сотрудники</CardTitle>
+                  <CardTitle className="text-base md:text-lg">Активные сотрудники</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {employees.filter(e => e.status === 'active').slice(0, 5).map((employee) => (
                       <div key={employee.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
                           <Icon name="User" size={20} className="text-primary" />
                         </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{employee.fullName}</p>
-                          <p className="text-xs text-muted-foreground">{employee.position}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{employee.fullName}</p>
+                          <p className="text-xs text-muted-foreground truncate">{employee.position}</p>
                         </div>
                       </div>
                     ))}
@@ -408,21 +471,21 @@ export default function Index() {
 
           <TabsContent value="employees">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Управление сотрудниками</CardTitle>
+              <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0">
+                <CardTitle className="text-base md:text-lg">Управление сотрудниками</CardTitle>
                 {user.role === 'admin' && (
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button>
+                      <Button className="w-full md:w-auto">
                         <Icon name="UserPlus" size={18} className="mr-2" />
-                        Добавить сотрудника
+                        Добавить
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
+                    <DialogContent className="max-w-2xl mx-3 md:mx-auto">
                       <DialogHeader>
                         <DialogTitle>Создание нового сотрудника</DialogTitle>
                       </DialogHeader>
-                      <div className="grid grid-cols-2 gap-4 py-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 max-h-[70vh] overflow-y-auto">
                         <div className="space-y-2">
                           <Label>Логин</Label>
                           <Input
@@ -438,7 +501,7 @@ export default function Index() {
                             onChange={(e) => setNewEmployee({...newEmployee, password: e.target.value})}
                           />
                         </div>
-                        <div className="space-y-2 col-span-2">
+                        <div className="space-y-2 md:col-span-2">
                           <Label>ФИО</Label>
                           <Input
                             value={newEmployee.fullName}
@@ -485,19 +548,20 @@ export default function Index() {
               <CardContent>
                 <div className="space-y-3">
                   {employees.map((employee) => (
-                    <div key={employee.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                          <Icon name="User" size={24} className="text-primary" />
+                    <div key={employee.id} className="flex flex-col md:flex-row md:items-center md:justify-between p-3 md:p-4 border rounded-lg hover:bg-muted/50 transition-colors space-y-3 md:space-y-0">
+                      <div className="flex items-center gap-3 md:gap-4">
+                        <div className="w-10 h-10 md:w-12 md:h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Icon name="User" size={20} className="text-primary md:hidden" />
+                          <Icon name="User" size={24} className="text-primary hidden md:block" />
                         </div>
-                        <div>
-                          <p className="font-semibold">{employee.fullName}</p>
-                          <p className="text-sm text-muted-foreground">{employee.position} • {employee.department}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{employee.email} • {employee.phone}</p>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm md:text-base truncate">{employee.fullName}</p>
+                          <p className="text-xs md:text-sm text-muted-foreground truncate">{employee.position} • {employee.department}</p>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">{employee.email} • {employee.phone}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant={employee.status === 'active' ? 'default' : 'secondary'}>
+                        <Badge variant={employee.status === 'active' ? 'default' : 'secondary'} className="text-xs">
                           {employee.status === 'active' ? 'Активен' : 'Неактивен'}
                         </Badge>
                         {user.role === 'admin' && employee.status === 'active' && (
@@ -505,8 +569,9 @@ export default function Index() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleDeactivateEmployee(employee.id)}
+                            className="text-xs"
                           >
-                            <Icon name="UserX" size={16} className="mr-1" />
+                            <Icon name="UserX" size={14} className="mr-1" />
                             Деактивировать
                           </Button>
                         )}
@@ -523,20 +588,20 @@ export default function Index() {
 
           <TabsContent value="requests">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Система заявок</CardTitle>
+              <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0">
+                <CardTitle className="text-base md:text-lg">Система заявок</CardTitle>
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button>
+                    <Button className="w-full md:w-auto">
                       <Icon name="Plus" size={18} className="mr-2" />
                       Создать заявку
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="mx-3 md:mx-auto">
                     <DialogHeader>
                       <DialogTitle>Новая заявка</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
+                    <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
                       <div className="space-y-2">
                         <Label>Заголовок</Label>
                         <Input
@@ -579,37 +644,38 @@ export default function Index() {
               <CardContent>
                 <div className="space-y-3">
                   {requests.map((request) => (
-                    <div key={request.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h3 className="font-semibold">{request.title}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">{request.description}</p>
+                    <div key={request.id} className="border rounded-lg p-3 md:p-4 hover:bg-muted/50 transition-colors">
+                      <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-3 space-y-2 md:space-y-0">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-sm md:text-base">{request.title}</h3>
+                          <p className="text-sm text-muted-foreground mt-1 break-words">{request.description}</p>
                           <p className="text-xs text-muted-foreground mt-2">
                             Автор: {request.authorName} • {new Date(request.createdAt).toLocaleDateString('ru-RU')}
                           </p>
                         </div>
-                        <div className="flex flex-col gap-2 items-end">
+                        <div className="flex md:flex-col gap-2 md:items-end">
                           <Badge variant={
                             request.priority === 'urgent' ? 'destructive' :
                             request.priority === 'high' ? 'default' : 'secondary'
-                          }>
+                          } className="text-xs">
                             {request.priority}
                           </Badge>
                           <Badge variant={
                             request.status === 'resolved' ? 'default' :
                             request.status === 'pending' ? 'secondary' : 'outline'
-                          }>
+                          } className="text-xs">
                             {request.status}
                           </Badge>
                         </div>
                       </div>
                       {user.role === 'admin' && (
-                        <div className="flex gap-2 pt-3 border-t">
+                        <div className="flex flex-wrap gap-2 pt-3 border-t">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleUpdateRequestStatus(request.id, 'in_progress')}
                             disabled={request.status === 'in_progress'}
+                            className="text-xs"
                           >
                             В работе
                           </Button>
@@ -618,6 +684,7 @@ export default function Index() {
                             variant="outline"
                             onClick={() => handleUpdateRequestStatus(request.id, 'resolved')}
                             disabled={request.status === 'resolved'}
+                            className="text-xs"
                           >
                             Решено
                           </Button>
@@ -626,6 +693,7 @@ export default function Index() {
                             variant="outline"
                             onClick={() => handleUpdateRequestStatus(request.id, 'closed')}
                             disabled={request.status === 'closed'}
+                            className="text-xs"
                           >
                             Закрыто
                           </Button>
@@ -638,6 +706,63 @@ export default function Index() {
                   )}
                 </div>
               </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="chat">
+            <Card className="h-[calc(100vh-12rem)] md:h-[calc(100vh-14rem)] flex flex-col">
+              <CardHeader className="border-b">
+                <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                  <Icon name="MessageSquare" size={20} />
+                  Общий чат команды
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Обновляется автоматически каждые 3 секунды</p>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-y-auto p-3 md:p-6">
+                <div className="space-y-3 md:space-y-4">
+                  {chatMessages.map((msg) => (
+                    <div key={msg.id} className={`flex ${msg.authorUsername === user.username ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] md:max-w-[70%] ${msg.authorUsername === user.username ? 'bg-primary text-primary-foreground' : 'bg-muted'} rounded-lg p-3 md:p-4`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-xs font-semibold">
+                            {msg.authorName}
+                          </p>
+                          <Badge variant={msg.authorRole === 'admin' ? 'default' : 'secondary'} className="text-xs h-4">
+                            {msg.authorRole === 'admin' ? 'Админ' : 'Сотрудник'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm break-words">{msg.message}</p>
+                        <p className="text-xs opacity-70 mt-1">
+                          {new Date(msg.createdAt).toLocaleString('ru-RU', { 
+                            day: '2-digit', 
+                            month: '2-digit', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                  {chatMessages.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">Сообщений пока нет. Начните общение!</p>
+                  )}
+                </div>
+              </CardContent>
+              <div className="border-t p-3 md:p-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Введите сообщение..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
+                    <Icon name="Send" size={18} />
+                  </Button>
+                </div>
+              </div>
             </Card>
           </TabsContent>
         </Tabs>
