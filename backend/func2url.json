@@ -1,0 +1,7 @@
+{
+  "requests": "https://functions.poehali.dev/f165cb8c-9f6d-4368-936a-459297066088",
+  "auth": "https://functions.poehali.dev/79f52abf-6019-4592-8ac1-10540fea6d22",
+  "employees": "https://functions.poehali.dev/4425d475-de9f-4e79-81ab-a9eb1376bb3a",
+  "messages": "https://functions.poehali.dev/1cd86b29-a8cf-4abb-bb82-bb5d458435f1",
+  "stats": "https://functions.poehali.dev/9998c142-84ea-4771-8292-c75afcabcb97"
+}

@@ -1,0 +1,37 @@
+{
+  "tests": [
+    {
+      "name": "Test successful login",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "username": "Satoru",
+        "password": "Satoru1212"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "token": "token_1_Satoru",
+        "user": {
+          "id": 1,
+          "username": "Satoru",
+          "role": "admin"
+        }
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test invalid credentials",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "username": "wrong",
+        "password": "wrong"
+      },
+      "expectedStatus": 401,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

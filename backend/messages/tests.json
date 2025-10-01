@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "name": "Test get messages without requestId",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
