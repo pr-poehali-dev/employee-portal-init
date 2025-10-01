@@ -62,6 +62,33 @@ const API_URLS = {
   messages: 'https://functions.poehali.dev/1cd86b29-a8cf-4abb-bb82-bb5d458435f1'
 };
 
+const getStatusLabel = (status: string): string => {
+  const statusMap: { [key: string]: string } = {
+    'pending': 'Ожидает',
+    'in_progress': 'В работе',
+    'resolved': 'Решено',
+    'closed': 'Закрыто',
+    'scheduled': 'Запланирована',
+    'completed': 'Завершена',
+    'cancelled': 'Отменена',
+    'active': 'Активен',
+    'inactive': 'Неактивен'
+  };
+  return statusMap[status] || status;
+};
+
+const getPriorityLabel = (priority: string): string => {
+  const priorityMap: { [key: string]: string } = {
+    'low': 'Низкий',
+    'medium': 'Средний',
+    'high': 'Высокий',
+    'urgent': 'Срочный',
+    'approved': 'Одобрено',
+    'rejected': 'Отклонено'
+  };
+  return priorityMap[priority] || priority;
+};
+
 export default function Index() {
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState('');
@@ -73,6 +100,8 @@ export default function Index() {
   const [loginError, setLoginError] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [newEmployee, setNewEmployee] = useState({
@@ -191,6 +220,29 @@ export default function Index() {
     }
   };
 
+  const handleDeleteEmployee = async (employeeId: number) => {
+    try {
+      const response = await fetch(API_URLS.employees, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: employeeId })
+      });
+
+      if (response.ok) {
+        loadData();
+        setDeleteDialogOpen(false);
+        setEmployeeToDelete(null);
+      }
+    } catch (error) {
+      console.error('Ошибка удаления сотрудника:', error);
+    }
+  };
+
+  const confirmDeleteEmployee = (employeeId: number) => {
+    setEmployeeToDelete(employeeId);
+    setDeleteDialogOpen(true);
+  };
+
   const handleDeactivateEmployee = async (employeeId: number) => {
     try {
       await fetch(API_URLS.employees, {
@@ -272,17 +324,18 @@ export default function Index() {
           <CardContent className="p-6">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Логин</Label>
+                <Label htmlFor="username" className="text-sm">Логин</Label>
                 <Input
                   id="username"
                   placeholder="Введите логин"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                  className="h-11"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Пароль</Label>
+                <Label htmlFor="password" className="text-sm">Пароль</Label>
                 <Input
                   id="password"
                   type="password"
@@ -290,6 +343,7 @@ export default function Index() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                  className="h-11"
                 />
               </div>
               {loginError && (
@@ -297,7 +351,7 @@ export default function Index() {
                   {loginError}
                 </div>
               )}
-              <Button onClick={handleLogin} className="w-full" size="lg">
+              <Button onClick={handleLogin} className="w-full h-11" size="lg">
                 <Icon name="LogIn" size={20} className="mr-2" />
                 Войти в систему
               </Button>
@@ -335,7 +389,7 @@ export default function Index() {
                   {user.role === 'admin' ? 'Админ' : 'Сотрудник'}
                 </Badge>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setUser(null)}>
+              <Button variant="outline" size="sm" onClick={() => setUser(null)} className="min-h-[44px]">
                 <Icon name="LogOut" size={16} />
               </Button>
             </div>
@@ -345,94 +399,94 @@ export default function Index() {
 
       <main className="container mx-auto px-3 md:px-4 py-4 md:py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4 md:mb-6 grid grid-cols-4 w-full">
-            <TabsTrigger value="dashboard" className="text-xs md:text-sm">
-              <Icon name="LayoutDashboard" size={16} className="mr-0 md:mr-2" />
-              <span className="hidden md:inline">Дашборд</span>
+          <TabsList className="mb-4 md:mb-6 grid grid-cols-4 w-full h-auto">
+            <TabsTrigger value="dashboard" className="text-xs md:text-sm min-h-[44px] flex-col md:flex-row gap-1 md:gap-2">
+              <Icon name="LayoutDashboard" size={16} />
+              <span className="md:inline">Дашборд</span>
             </TabsTrigger>
-            <TabsTrigger value="employees" className="text-xs md:text-sm">
-              <Icon name="Users" size={16} className="mr-0 md:mr-2" />
-              <span className="hidden md:inline">Сотрудники</span>
+            <TabsTrigger value="employees" className="text-xs md:text-sm min-h-[44px] flex-col md:flex-row gap-1 md:gap-2">
+              <Icon name="Users" size={16} />
+              <span className="md:inline">Сотрудники</span>
             </TabsTrigger>
-            <TabsTrigger value="requests" className="text-xs md:text-sm">
-              <Icon name="FileText" size={16} className="mr-0 md:mr-2" />
-              <span className="hidden md:inline">Заявки</span>
+            <TabsTrigger value="requests" className="text-xs md:text-sm min-h-[44px] flex-col md:flex-row gap-1 md:gap-2">
+              <Icon name="FileText" size={16} />
+              <span className="md:inline">Заявки</span>
             </TabsTrigger>
-            <TabsTrigger value="chat" className="text-xs md:text-sm">
-              <Icon name="MessageSquare" size={16} className="mr-0 md:mr-2" />
-              <span className="hidden md:inline">Чат</span>
+            <TabsTrigger value="chat" className="text-xs md:text-sm min-h-[44px] flex-col md:flex-row gap-1 md:gap-2">
+              <Icon name="MessageSquare" size={16} />
+              <span className="md:inline">Чат</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-4 md:space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                  <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-4 md:p-6">
+                  <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">
                     Сотрудников
                   </CardTitle>
                   <Icon name="Users" size={18} className="text-primary" />
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 md:p-6 pt-0">
                   <div className="text-2xl md:text-3xl font-bold">{stats?.totalEmployees || 0}</div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                  <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-4 md:p-6">
+                  <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">
                     Заявок
                   </CardTitle>
                   <Icon name="FileText" size={18} className="text-primary" />
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 md:p-6 pt-0">
                   <div className="text-2xl md:text-3xl font-bold">{stats?.totalRequests || 0}</div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                  <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-4 md:p-6">
+                  <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">
                     В ожидании
                   </CardTitle>
                   <Icon name="Clock" size={18} className="text-amber-500" />
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 md:p-6 pt-0">
                   <div className="text-2xl md:text-3xl font-bold text-amber-600">{stats?.pendingRequests || 0}</div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                  <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-4 md:p-6">
+                  <CardTitle className="text-sm md:text-sm font-medium text-muted-foreground">
                     Решено
                   </CardTitle>
                   <Icon name="CheckCircle" size={18} className="text-green-500" />
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 md:p-6 pt-0">
                   <div className="text-2xl md:text-3xl font-bold text-green-600">{stats?.resolvedRequests || 0}</div>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <Card>
-                <CardHeader>
+                <CardHeader className="p-4 md:p-6">
                   <CardTitle className="text-base md:text-lg">Последние заявки</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 md:p-6 pt-0">
                   <div className="space-y-3">
                     {requests.slice(0, 5).map((request) => (
                       <div key={request.id} className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{request.title}</p>
-                          <p className="text-xs text-muted-foreground mt-1 truncate">{request.authorName}</p>
+                          <p className="font-medium text-sm md:text-base truncate">{request.title}</p>
+                          <p className="text-xs md:text-sm text-muted-foreground mt-1 truncate">{request.authorName}</p>
                         </div>
                         <Badge variant={
                           request.status === 'resolved' ? 'default' :
                           request.status === 'pending' ? 'secondary' : 'outline'
                         } className="text-xs flex-shrink-0 ml-2">
-                          {request.status}
+                          {getStatusLabel(request.status)}
                         </Badge>
                       </div>
                     ))}
@@ -444,10 +498,10 @@ export default function Index() {
               </Card>
 
               <Card>
-                <CardHeader>
+                <CardHeader className="p-4 md:p-6">
                   <CardTitle className="text-base md:text-lg">Активные сотрудники</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 md:p-6 pt-0">
                   <div className="space-y-3">
                     {employees.filter(e => e.status === 'active').slice(0, 5).map((employee) => (
                       <div key={employee.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
@@ -455,8 +509,8 @@ export default function Index() {
                           <Icon name="User" size={20} className="text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{employee.fullName}</p>
-                          <p className="text-xs text-muted-foreground truncate">{employee.position}</p>
+                          <p className="font-medium text-sm md:text-base truncate">{employee.fullName}</p>
+                          <p className="text-xs md:text-sm text-muted-foreground truncate">{employee.position}</p>
                         </div>
                       </div>
                     ))}
@@ -471,84 +525,91 @@ export default function Index() {
 
           <TabsContent value="employees">
             <Card>
-              <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0">
+              <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0 p-4 md:p-6">
                 <CardTitle className="text-base md:text-lg">Управление сотрудниками</CardTitle>
                 {user.role === 'admin' && (
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button className="w-full md:w-auto">
+                      <Button className="w-full md:w-auto min-h-[44px]">
                         <Icon name="UserPlus" size={18} className="mr-2" />
-                        Добавить
+                        Добавить сотрудника
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl mx-3 md:mx-auto">
+                    <DialogContent className="max-w-2xl mx-3 md:mx-auto max-h-[85vh] overflow-y-auto">
                       <DialogHeader>
-                        <DialogTitle>Создание нового сотрудника</DialogTitle>
+                        <DialogTitle className="text-base md:text-lg">Создание нового сотрудника</DialogTitle>
                       </DialogHeader>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 max-h-[70vh] overflow-y-auto">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
                         <div className="space-y-2">
-                          <Label>Логин</Label>
+                          <Label className="text-sm">Логин</Label>
                           <Input
                             value={newEmployee.username}
                             onChange={(e) => setNewEmployee({...newEmployee, username: e.target.value})}
+                            className="h-11"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Пароль</Label>
+                          <Label className="text-sm">Пароль</Label>
                           <Input
                             type="password"
                             value={newEmployee.password}
                             onChange={(e) => setNewEmployee({...newEmployee, password: e.target.value})}
+                            className="h-11"
                           />
                         </div>
                         <div className="space-y-2 md:col-span-2">
-                          <Label>ФИО</Label>
+                          <Label className="text-sm">ФИО</Label>
                           <Input
                             value={newEmployee.fullName}
                             onChange={(e) => setNewEmployee({...newEmployee, fullName: e.target.value})}
+                            className="h-11"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Должность</Label>
+                          <Label className="text-sm">Должность</Label>
                           <Input
                             value={newEmployee.position}
                             onChange={(e) => setNewEmployee({...newEmployee, position: e.target.value})}
+                            className="h-11"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Отдел</Label>
+                          <Label className="text-sm">Отдел</Label>
                           <Input
                             value={newEmployee.department}
                             onChange={(e) => setNewEmployee({...newEmployee, department: e.target.value})}
+                            className="h-11"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Email</Label>
+                          <Label className="text-sm">Email</Label>
                           <Input
                             type="email"
                             value={newEmployee.email}
                             onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
+                            className="h-11"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Телефон</Label>
+                          <Label className="text-sm">Телефон</Label>
                           <Input
                             value={newEmployee.phone}
                             onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
+                            className="h-11"
                           />
                         </div>
                       </div>
-                      <Button onClick={handleCreateEmployee} className="w-full">
+                      <Button onClick={handleCreateEmployee} className="w-full min-h-[44px]">
                         Создать сотрудника
                       </Button>
                     </DialogContent>
                   </Dialog>
                 )}
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 md:p-6">
                 <div className="space-y-3">
                   {employees.map((employee) => (
-                    <div key={employee.id} className="flex flex-col md:flex-row md:items-center md:justify-between p-3 md:p-4 border rounded-lg hover:bg-muted/50 transition-colors space-y-3 md:space-y-0">
+                    <div key={employee.id} className="flex flex-col md:flex-row md:items-center md:justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors space-y-3 md:space-y-0">
                       <div className="flex items-center gap-3 md:gap-4">
                         <div className="w-10 h-10 md:w-12 md:h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
                           <Icon name="User" size={20} className="text-primary md:hidden" />
@@ -557,29 +618,40 @@ export default function Index() {
                         <div className="min-w-0">
                           <p className="font-semibold text-sm md:text-base truncate">{employee.fullName}</p>
                           <p className="text-xs md:text-sm text-muted-foreground truncate">{employee.position} • {employee.department}</p>
-                          <p className="text-xs text-muted-foreground mt-1 truncate">{employee.email} • {employee.phone}</p>
+                          <p className="text-xs text-muted-foreground mt-1 truncate md:block hidden">{employee.email} • {employee.phone}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant={employee.status === 'active' ? 'default' : 'secondary'} className="text-xs">
-                          {employee.status === 'active' ? 'Активен' : 'Неактивен'}
+                          {getStatusLabel(employee.status)}
                         </Badge>
                         {user.role === 'admin' && employee.status === 'active' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeactivateEmployee(employee.id)}
-                            className="text-xs"
-                          >
-                            <Icon name="UserX" size={14} className="mr-1" />
-                            Деактивировать
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeactivateEmployee(employee.id)}
+                              className="text-xs min-h-[44px]"
+                            >
+                              <Icon name="UserX" size={14} className="mr-1" />
+                              Деактивировать
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => confirmDeleteEmployee(employee.id)}
+                              className="text-xs min-h-[44px]"
+                            >
+                              <Icon name="Trash2" size={14} className="mr-1" />
+                              Удалить
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
                   ))}
                   {employees.length === 0 && (
-                    <p className="text-center text-muted-foreground py-8">Сотрудников пока нет</p>
+                    <p className="text-center text-muted-foreground py-8 text-sm">Сотрудников пока нет</p>
                   )}
                 </div>
               </CardContent>
@@ -588,42 +660,44 @@ export default function Index() {
 
           <TabsContent value="requests">
             <Card>
-              <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0">
+              <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0 p-4 md:p-6">
                 <CardTitle className="text-base md:text-lg">Система заявок</CardTitle>
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button className="w-full md:w-auto">
+                    <Button className="w-full md:w-auto min-h-[44px]">
                       <Icon name="Plus" size={18} className="mr-2" />
                       Создать заявку
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="mx-3 md:mx-auto">
+                  <DialogContent className="mx-3 md:mx-auto max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Новая заявка</DialogTitle>
+                      <DialogTitle className="text-base md:text-lg">Новая заявка</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
+                    <div className="space-y-4 py-4">
                       <div className="space-y-2">
-                        <Label>Заголовок</Label>
+                        <Label className="text-sm">Заголовок</Label>
                         <Input
                           value={newRequest.title}
                           onChange={(e) => setNewRequest({...newRequest, title: e.target.value})}
+                          className="h-11"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Описание</Label>
+                        <Label className="text-sm">Описание</Label>
                         <Textarea
                           value={newRequest.description}
                           onChange={(e) => setNewRequest({...newRequest, description: e.target.value})}
                           rows={4}
+                          className="resize-none"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Приоритет</Label>
+                        <Label className="text-sm">Приоритет</Label>
                         <Select
                           value={newRequest.priority}
                           onValueChange={(value) => setNewRequest({...newRequest, priority: value})}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-11">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -635,16 +709,16 @@ export default function Index() {
                         </Select>
                       </div>
                     </div>
-                    <Button onClick={handleCreateRequest} className="w-full">
+                    <Button onClick={handleCreateRequest} className="w-full min-h-[44px]">
                       Создать заявку
                     </Button>
                   </DialogContent>
                 </Dialog>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 md:p-6">
                 <div className="space-y-3">
                   {requests.map((request) => (
-                    <div key={request.id} className="border rounded-lg p-3 md:p-4 hover:bg-muted/50 transition-colors">
+                    <div key={request.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-3 space-y-2 md:space-y-0">
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-sm md:text-base">{request.title}</h3>
@@ -658,13 +732,13 @@ export default function Index() {
                             request.priority === 'urgent' ? 'destructive' :
                             request.priority === 'high' ? 'default' : 'secondary'
                           } className="text-xs">
-                            {request.priority}
+                            {getPriorityLabel(request.priority)}
                           </Badge>
                           <Badge variant={
                             request.status === 'resolved' ? 'default' :
                             request.status === 'pending' ? 'secondary' : 'outline'
                           } className="text-xs">
-                            {request.status}
+                            {getStatusLabel(request.status)}
                           </Badge>
                         </div>
                       </div>
@@ -675,7 +749,7 @@ export default function Index() {
                             variant="outline"
                             onClick={() => handleUpdateRequestStatus(request.id, 'in_progress')}
                             disabled={request.status === 'in_progress'}
-                            className="text-xs"
+                            className="text-xs min-h-[44px]"
                           >
                             В работе
                           </Button>
@@ -684,7 +758,7 @@ export default function Index() {
                             variant="outline"
                             onClick={() => handleUpdateRequestStatus(request.id, 'resolved')}
                             disabled={request.status === 'resolved'}
-                            className="text-xs"
+                            className="text-xs min-h-[44px]"
                           >
                             Решено
                           </Button>
@@ -693,7 +767,7 @@ export default function Index() {
                             variant="outline"
                             onClick={() => handleUpdateRequestStatus(request.id, 'closed')}
                             disabled={request.status === 'closed'}
-                            className="text-xs"
+                            className="text-xs min-h-[44px]"
                           >
                             Закрыто
                           </Button>
@@ -702,7 +776,7 @@ export default function Index() {
                     </div>
                   ))}
                   {requests.length === 0 && (
-                    <p className="text-center text-muted-foreground py-8">Заявок пока нет</p>
+                    <p className="text-center text-muted-foreground py-8 text-sm">Заявок пока нет</p>
                   )}
                 </div>
               </CardContent>
@@ -711,7 +785,7 @@ export default function Index() {
 
           <TabsContent value="chat">
             <Card className="h-[calc(100vh-12rem)] md:h-[calc(100vh-14rem)] flex flex-col">
-              <CardHeader className="border-b">
+              <CardHeader className="border-b p-4 md:p-6">
                 <CardTitle className="text-base md:text-lg flex items-center gap-2">
                   <Icon name="MessageSquare" size={20} />
                   Общий чат команды
@@ -724,14 +798,14 @@ export default function Index() {
                     <div key={msg.id} className={`flex ${msg.authorUsername === user.username ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] md:max-w-[70%] ${msg.authorUsername === user.username ? 'bg-primary text-primary-foreground' : 'bg-muted'} rounded-lg p-3 md:p-4`}>
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="text-xs font-semibold">
+                          <p className="text-xs md:text-sm font-semibold">
                             {msg.authorName}
                           </p>
                           <Badge variant={msg.authorRole === 'admin' ? 'default' : 'secondary'} className="text-xs h-4">
                             {msg.authorRole === 'admin' ? 'Админ' : 'Сотрудник'}
                           </Badge>
                         </div>
-                        <p className="text-sm break-words">{msg.message}</p>
+                        <p className="text-sm md:text-base break-words">{msg.message}</p>
                         <p className="text-xs opacity-70 mt-1">
                           {new Date(msg.createdAt).toLocaleString('ru-RU', { 
                             day: '2-digit', 
@@ -745,7 +819,7 @@ export default function Index() {
                   ))}
                   <div ref={chatEndRef} />
                   {chatMessages.length === 0 && (
-                    <p className="text-center text-muted-foreground py-8">Сообщений пока нет. Начните общение!</p>
+                    <p className="text-center text-muted-foreground py-8 text-sm">Сообщений пока нет. Начните общение!</p>
                   )}
                 </div>
               </CardContent>
@@ -756,9 +830,9 @@ export default function Index() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    className="flex-1"
+                    className="flex-1 h-11"
                   />
-                  <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
+                  <Button onClick={handleSendMessage} disabled={!newMessage.trim()} className="min-h-[44px] min-w-[44px]">
                     <Icon name="Send" size={18} />
                   </Button>
                 </div>
@@ -767,6 +841,36 @@ export default function Index() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="mx-3 md:mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base md:text-lg">Подтверждение удаления</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm md:text-base">Вы уверены, что хотите удалить этого сотрудника? Это действие нельзя отменить.</p>
+          </div>
+          <div className="flex gap-2 flex-col md:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setEmployeeToDelete(null);
+              }}
+              className="w-full min-h-[44px]"
+            >
+              Отмена
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => employeeToDelete && handleDeleteEmployee(employeeToDelete)}
+              className="w-full min-h-[44px]"
+            >
+              Удалить
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
